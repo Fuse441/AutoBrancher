@@ -1,36 +1,197 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 const vscode = require('vscode');
+const fs = require('fs');
+const path = require('path');
+// @ts-ignore
+const git = require('isomorphic-git');
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
+const dir = vscode.workspace.workspaceFolders[0].uri.fsPath;
+const patternRedirect = /@TABLE\.(\w+)\.(\w+)/g;
+const outputChannel = vscode.window.createOutputChannel('AutoBrancher');
+const FuncHelper = {
+  parseRedirectStep: (fileContent) => {
+    const matches = [...fileContent.matchAll(patternRedirect)];
+    return matches.map(([, collection, document]) => ({ collection, document }));
+  },
+  findAllRedirectsDeep(obj, redirects = []) {
+    if (typeof obj === 'string') {
+      let match;
+      while ((match = patternRedirect.exec(obj)) !== null) {
+        redirects.push({ collection: match[1], document: match[2] });
+      }
+    } else if (Array.isArray(obj)) {
+      for (const item of obj) {
+        FuncHelper.findAllRedirectsDeep(item, redirects);
+      }
+    } else if (typeof obj === 'object' && obj !== null) {
+      for (const key in obj) {
+        FuncHelper.findAllRedirectsDeep(obj[key], redirects);
+      }
+    }
+    return redirects;
+  }
+};
 
-/**
- * @param {vscode.ExtensionContext} context
- */
-function activate(context) {
+class StackAPI {
+  constructor(protocol) {
+    this.protocol = protocol;
+    this.listFile = [];
+  }
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "autobrancher" is now active!');
+  build() {
+    this._firstStep();
+    this._processRedirectStepRecursive(this.protocol);
+    this._getResourceProfile();
+    return this.listFile;
+  }
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with  registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('autobrancher.helloWorld', function () {
-		// The code you place here will be executed every time your command is executed
+  _getResourceProfile() {
+    const { url } = JSON.parse(this.protocol);
+    const dirProfile = fs.readdirSync(path.join(dir, 'resource_profile'));
 
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from AutoBrancher!');
-	});
+    dirProfile.forEach(element => {
+      const data = fs.readFileSync(path.join(dir, 'resource_profile', element), 'utf-8');
+      const found = JSON.parse(data).uri.includes(url);
+      if (found) {
+        const result = JSON.parse(data);
+        this.listFile.push({
+          name: 'resource_profile',
+          fileName: `${result.resource}_${result.authenNode}-${result.authenType}.json`,
+          value: result
+        });
+      }
+    });
+  }
 
-	context.subscriptions.push(disposable);
+  _firstStep() {
+    try {
+      const parsed = JSON.parse(this.protocol);
+      this.listFile.push({
+        name: 'protocol',
+        fileName: `pt_${parsed.method}_${parsed.commandName}.json`,
+        value: parsed
+      });
+    } catch (error) {
+      vscode.window.showErrorMessage('⛔ Error parsing protocol: ' + error.message);
+    }
+  }
+
+  _processRedirectStepRecursive(fileContent) {
+    let redirectList = [];
+    try {
+      const json = JSON.parse(fileContent);
+      redirectList = FuncHelper.findAllRedirectsDeep(json);
+    } catch (e) {
+      redirectList = FuncHelper.parseRedirectStep(fileContent);
+    }
+
+    const uniqueRedirects = [...new Set(redirectList.map(r => `${r.collection}.${r.document}`))]
+      .map(str => {
+        const [collection, document] = str.split('.');
+        return { collection, document };
+      });
+
+    for (const { collection, document } of uniqueRedirects) {
+      if (document === 'cd_mapModelResponse') continue;
+
+      const filePath = path.join(dir, collection, `${document}.json`);
+      const alreadyExists = this.listFile.some(
+        item => item.name === collection && item.fileName === `${document}.json`
+      );
+      if (alreadyExists) continue;
+
+      try {
+        const data = fs.readFileSync(filePath, 'utf-8');
+        this.listFile.push({ name: collection, fileName: `${document}.json`, value: JSON.parse(data) });
+        this._processRedirectStepRecursive(data);
+      } catch (e) {
+		outputChannel.appendLine(`⚠️ Missing file: ${filePath}`);
+      }
+    }
+  }
 }
 
-// This method is called when your extension is deactivated
+async function runAutoBrancher(input) {
+  try {
+    const protocolPath = path.join(dir, 'protocol');
+    const folder = fs.readdirSync(protocolPath);
+
+    if (input === '*') {
+      for (const item of folder) {
+        const protocol = fs.readFileSync(path.join(protocolPath, item), 'utf-8');
+        await createBranchFromProtocol(protocol);
+      }
+    } else {
+      let matchedData = '';
+      const matched = folder.find((item) => {
+        const data = fs.readFileSync(path.join(protocolPath, item), 'utf-8');
+        const json = JSON.parse(data);
+        if (json.commandName === input) {
+          matchedData = path.join(protocolPath, item);
+          return true;
+        }
+        return false;
+      });
+
+      if (matched) {
+        const protocol = fs.readFileSync(matchedData, 'utf-8');
+        await createBranchFromProtocol(protocol);
+      } else {
+        outputChannel.appendLine(`❌ No matching protocol for input "${input}"`);
+      }
+    }
+  } catch (error) {
+    outputChannel.appendLine('❌ Error: ' + error.message);
+  }
+}
+
+async function createBranchFromProtocol(protocol) {
+  const api = new StackAPI(protocol).build();
+  const { commandName, method } = api[0].value;
+  const newBranch = `feature/api_${method}-${commandName}`;
+
+  await git.checkout({ fs, dir, ref: 'template', force: true });
+
+  try {
+    await git.deleteBranch({ fs, dir, ref: newBranch });
+  } catch (e) {
+    // may not exist — ignore
+  }
+
+  await git.branch({ fs, dir, ref: newBranch });
+  await git.checkout({ fs, dir, ref: newBranch });
+
+  api.forEach((obj) => {
+    const jsonContent = JSON.stringify(obj.value, null, 2);
+    const filePath = path.join(dir, obj.name, obj.fileName);
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, jsonContent);
+  });
+
+  outputChannel.appendLine(`✅ Created and checked out to branch ${newBranch} from template`);
+}
+
+
+// VS Code activation
+function activate(context) {
+  const disposable = vscode.commands.registerCommand('autobrancher.run', async () => {
+	outputChannel.clear();
+	outputChannel.show();
+	const input = await vscode.window.showInputBox({
+		prompt: 'กรุณากรอก commandName ที่ต้องการ',
+		placeHolder: 'เช่น cpassCallback หรือต้องการทั้งหมดใส่ *',
+		ignoreFocusOut: true
+	});
+	// console.log("input ==> ", input);
+
+    runAutoBrancher(input);
+  });
+
+  context.subscriptions.push(disposable);
+}
+
 function deactivate() {}
 
 module.exports = {
-	activate,
-	deactivate
-}
+  activate,
+  deactivate
+};
