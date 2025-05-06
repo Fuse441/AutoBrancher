@@ -154,7 +154,7 @@ async function generateScriptOnly(protocol) {
   let scriptContent = '';
 
   api.forEach((obj) => {
-  console.log("obj ==> ", obj);
+  // console.log("obj ==> ", obj);
     const collectionName = obj.name;
     const filter = obj.name == "protocol" ? JSON.stringify({ url : obj.value.url }, null, 2) : JSON.stringify({ [Object.keys(obj.value)[0]]: { $exists: true } }, null, 2);
     const update = JSON.stringify({ $set:  obj.value  }, null, 2)
