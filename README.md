@@ -1,65 +1,49 @@
-# autobrancher README
+# 🧩 autoGenerate VS Code Extension
 
-This is the README for your extension "autobrancher". After writing up a brief description, we recommend including the following sections.
-
-## Features
-
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
-
-For example if there is an image subfolder under your extension project workspace:
-
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
-
-## Requirements
-
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
-
-## Extension Settings
-
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
-
-## Known Issues
-
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
+`autoGenerate` is a Visual Studio Code extension designed to assist API development teams by automating tasks related to protocol files, Git branching, and MongoDB scripting.
 
 ---
 
-## Working with Markdown
+## 🚀 Key Features
 
-You can author your README using Visual Studio Code.  Here are some useful editor keyboard shortcuts:
+### 1. 🔀 Auto Create Git Branch
+- Automatically creates a Git branch from a protocol file
+- Branch format: `feature/api_<method>-<commandName>`
+- Loads and collects all related JSON files referenced via `@TABLE.collection.document`
 
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux)
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux)
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets
+### 2. 📜 Generate MongoDB Script
+- Generates `updateOne(..., { upsert: true })` scripts for MongoDB
+- Based on protocol data, resource profiles, and all related JSON files
 
-## For more information
+### 3. 🔍 Recursive Redirect JSON Lookup
+- Searches for `@TABLE.collection.document` references within deeply nested protocol JSON
+- Automatically fetches and includes those JSON files
 
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+### 4. 📂 Validate Resource Profile
+- Checks `protocol.url` and finds the matching files within the `resource_profile` directory
 
-**Enjoy!**
+---
+
+## 🛠 How to Use
+
+### Open Command Palette
+Press `Ctrl + Shift + P` (or `Cmd + Shift + P` on macOS)
+
+### Available Commands
+
+#### ▶️ `AutoBrancher: Run`
+- Input a `commandName` (e.g., `cpassCallback`) to create a branch and collect related files
+- Use `*` to apply to all protocol files
+
+#### 📝 `GenerateScript: Run`
+- Input a `commandName` to generate a MongoDB script for that specific command
+- Use `*` to generate scripts for all protocols
+
+---
+
+## 📁 Folder Structure (Expected)
+
+```plaintext
+protocol/             # Folder containing protocol JSON files
+resource_profile/     # Folder containing resource profile files
+<collection>/<document>.json   # Referenced JSON files (via @TABLE)
