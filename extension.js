@@ -110,7 +110,7 @@ class StackAPI {
   }
 }
 
-async function runAutoBrancher(input) {
+async function runGenerate(input, mode = 'branch') {
   try {
     const protocolPath = path.join(dir, 'protocol');
     const folder = fs.readdirSync(protocolPath);
@@ -118,7 +118,7 @@ async function runAutoBrancher(input) {
     if (input === '*') {
       for (const item of folder) {
         const protocol = fs.readFileSync(path.join(protocolPath, item), 'utf-8');
-        await createBranchFromProtocol(protocol);
+        await handleProtocol(protocol, mode);
       }
     } else {
       let matchedData = '';
@@ -134,7 +134,7 @@ async function runAutoBrancher(input) {
 
       if (matched) {
         const protocol = fs.readFileSync(matchedData, 'utf-8');
-        await createBranchFromProtocol(protocol);
+        await handleProtocol(protocol, mode);
       } else {
         outputChannel.appendLine(`❌ No matching protocol for input "${input}"`);
       }
@@ -142,6 +142,35 @@ async function runAutoBrancher(input) {
   } catch (error) {
     outputChannel.appendLine('❌ Error: ' + error.message);
   }
+}
+
+async function generateScriptOnly(protocol) {
+  const api = new StackAPI(protocol).build();
+  const outputDir = path.join(dir,"dist");
+  const outputFile = path.join(outputDir, `${api[0].value.method}_${api[0].value.commandName}.js`);
+
+  fs.mkdirSync(outputDir, { recursive: true });
+
+  let scriptContent = '';
+
+  api.forEach((obj) => {
+  console.log("obj ==> ", obj);
+    const collectionName = obj.name;
+    const filter = obj.name == "protocol" ? JSON.stringify({ url : obj.value.url }, null, 2) : JSON.stringify({ [Object.keys(obj.value)[0]]: { $exists: true } }, null, 2);
+    const update = JSON.stringify({ $set:  obj.value  }, null, 2)
+
+    const script = `
+db.getCollection("${collectionName}").updateOne(
+  ${filter},
+  ${update},
+  { upsert: true }
+);\n`;
+    scriptContent += script;
+  });
+
+  fs.writeFileSync(outputFile, scriptContent);
+  // console.log("scriptContent ==> ", scriptContent);
+  outputChannel.appendLine(`✅ Generated script file at: ${outputFile}`);
 }
 
 async function createBranchFromProtocol(protocol) {
@@ -170,7 +199,13 @@ async function createBranchFromProtocol(protocol) {
   outputChannel.appendLine(`✅ Created and checked out to branch ${newBranch} from template`);
 }
 
-
+async function handleProtocol(protocol, mode) {
+  if (mode === 'script') {
+    generateScriptOnly(protocol);
+  } else {
+    await createBranchFromProtocol(protocol);
+  }
+}
 // VS Code activation
 function activate(context) {
   const disposable = vscode.commands.registerCommand('autobrancher.run', async () => {
@@ -183,9 +218,28 @@ function activate(context) {
 	});
 	// console.log("input ==> ", input);
 
-    runAutoBrancher(input);
+  runGenerate(input, 'branch');
+
   });
 
+
+  
+  const generateScriptDB = vscode.commands.registerCommand('generateScript.run', async () => {
+    outputChannel.clear();
+    outputChannel.show();
+  
+    const input = await vscode.window.showInputBox({
+      prompt: 'กรุณากรอก commandName ที่ต้องการสร้าง script',
+      placeHolder: 'เช่น cpassCallback หรือต้องการทั้งหมดใส่ *',
+      ignoreFocusOut: true
+    });
+  
+    runGenerate(input, 'script');
+
+
+  });
+  
+    context.subscriptions.push(generateScriptDB);
   context.subscriptions.push(disposable);
 }
 
@@ -195,3 +249,4 @@ module.exports = {
   activate,
   deactivate
 };
+

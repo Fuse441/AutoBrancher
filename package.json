@@ -1,6 +1,6 @@
 {
-  "name": "autobrancher",
-  "displayName": "AutoBrancher",
+  "name": "autogenerate",
+  "displayName": "autoGenerate",
   "description": "",
   "version": "0.0.1",
   "engines": {
@@ -20,6 +20,10 @@
       {
         "command": "autobrancher.run",
         "title": "AutoBrancher: Run Branch Builder"
+      },
+      {
+        "command": "generateScript.run",
+        "title": "generateScript: Run Script Builder"
       }
     ]
   },
