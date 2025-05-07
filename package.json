@@ -1,7 +1,8 @@
 {
-  "name": "autogenerate",
-  "displayName": "autoGenerate",
+  "name": "mongobrancher",
+  "displayName": "MongoBrancher",
   "description": "",
+  "publisher": "Demon-APIM",
   "version": "1.0.0",
   "engines": {
     "vscode": "^1.99.0"

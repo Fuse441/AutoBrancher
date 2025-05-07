@@ -5,7 +5,7 @@ const path = require('path');
 const git = require('isomorphic-git');
 
 const dir = vscode.workspace.workspaceFolders[0].uri.fsPath;
-const patternRedirect = /@TABLE\.(\w+)\.(\w+)/g;
+const patternRedirect = /@TABLE\.(\w+)\.(\w.+)\.?/g;
 const outputChannel = vscode.window.createOutputChannel('AutoBrancher');
 const FuncHelper = {
   parseRedirectStep: (fileContent) => {
@@ -79,9 +79,12 @@ class StackAPI {
     let redirectList = [];
     try {
       const json = JSON.parse(fileContent);
+      
       redirectList = FuncHelper.findAllRedirectsDeep(json);
+      
     } catch (e) {
       redirectList = FuncHelper.parseRedirectStep(fileContent);
+      
     }
 
     const uniqueRedirects = [...new Set(redirectList.map(r => `${r.collection}.${r.document}`))]
@@ -154,9 +157,14 @@ async function generateScriptOnly(protocol) {
   let scriptContent = '';
 
   api.forEach((obj) => {
-  // console.log("obj ==> ", obj);
+  // 
     const collectionName = obj.name;
-    const filter = obj.name == "protocol" ? JSON.stringify({ url : obj.value.url }, null, 2) : JSON.stringify({ [Object.keys(obj.value)[0]]: { $exists: true } }, null, 2);
+    const filter = obj.name === "protocol"
+    ? JSON.stringify({ url: obj.value.url }, null, 2)
+    : obj.name === "resource_profile"
+      ? JSON.stringify({ resource : obj.value.resource }, null, 2)
+      : JSON.stringify({ [Object.keys(obj.value)[0]]: { $exists: true } }, null, 2);
+  
     const update = JSON.stringify({ $set:  obj.value  }, null, 2)
 
     const script = `
@@ -169,7 +177,7 @@ db.getCollection("${collectionName}").updateOne(
   });
 
   fs.writeFileSync(outputFile, scriptContent);
-  // console.log("scriptContent ==> ", scriptContent);
+  // 
   outputChannel.appendLine(`✅ Generated script file at: ${outputFile}`);
 }
 
@@ -216,7 +224,7 @@ function activate(context) {
 		placeHolder: 'เช่น cpassCallback หรือต้องการทั้งหมดใส่ *',
 		ignoreFocusOut: true
 	});
-	// console.log("input ==> ", input);
+	// 
 
   runGenerate(input, 'branch');
 
@@ -227,7 +235,7 @@ function activate(context) {
   const generateScriptDB = vscode.commands.registerCommand('generateScript.run', async () => {
     outputChannel.clear();
     outputChannel.show();
-  
+    
     const input = await vscode.window.showInputBox({
       prompt: 'กรุณากรอก commandName ที่ต้องการสร้าง script',
       placeHolder: 'เช่น cpassCallback หรือต้องการทั้งหมดใส่ *',
