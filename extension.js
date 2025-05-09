@@ -101,7 +101,6 @@ class StackAPI {
     });
 
     for (const { collection, document } of uniqueRedirects) {
-      if (document === "cd_mapModelResponse") continue;
 
       const filePath = path.join(dir, collection, `${document}.json`);
       const alreadyExists = this.listFile.some(
