@@ -61,23 +61,28 @@ class StackAPI {
 
   _getResourceProfile() {
     const { url } = JSON.parse(this.protocol);
-    const dirProfile = fs.readdirSync(path.join(dir, "resource_profile"));
-
-    dirProfile.forEach((element) => {
-      const data = fs.readFileSync(
-        path.join(dir, "resource_profile", element),
-        "utf-8"
-      );
-      const found = JSON.parse(data).uri.includes(url);
-      if (found) {
-        const result = JSON.parse(data);
-        this.listFile.push({
-          name: "resource_profile",
-          fileName: `${result.resource}_${result.authenNode}-${result.authenType}.json`,
-          value: result,
-        });
-      }
-    });
+    const dirProfile = fs
+      .readdirSync(path.join(dir, "resource_profile"))
+      .filter((file) => file.endsWith(".json"));
+    try {
+      dirProfile.forEach((element) => {
+        const data = fs.readFileSync(
+          path.join(dir, "resource_profile", element),
+          "utf-8"
+        );
+        const found = JSON.parse(data).uri.includes(url);
+        if (found) {
+          const result = JSON.parse(data);
+          this.listFile.push({
+            name: "resource_profile",
+            fileName: `${result.resource}_${result.authenNode}-${result.authenType}.json`,
+            value: result,
+          });
+        }
+      });
+    } catch (error) {
+      outputChannel.appendLine("❌ error: " + error);
+    }
   }
 
   _firstStep() {
@@ -195,7 +200,7 @@ class StackAPI {
         } else {
         }
       } catch (e) {
-        console.error("❌ Invalid JSON or parse error:", e);
+        outputChannel.appendLine("❌ Invalid JSON or parse error: " + e);
       }
 
       this._selectCollection(validateCommand.value);
@@ -284,7 +289,7 @@ async function runGenerate(input, mode = "branch") {
     const protocolPath = path.join(dir, "protocol");
     const folder = fs
       .readdirSync(protocolPath)
-      .filter((file) => file.endsWith(".json")); // ✅ กรองเฉพาะ .json
+      .filter((file) => file.endsWith(".json"));
 
     if (input === "*") {
       for (const item of folder) {
@@ -319,7 +324,6 @@ async function runGenerate(input, mode = "branch") {
     outputChannel.appendLine("❌ Error: " + error.message);
   }
 }
-
 
 function runGenerateByCommand(input) {
   try {
