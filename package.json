@@ -3,7 +3,7 @@
   "displayName": "MongoBrancher",
   "description": "",
   "publisher": "Demon-APIM",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "engines": {
     "vscode": "^1.99.0"
   },
@@ -15,16 +15,16 @@
   "contributes": {
     "commands": [
       {
-        "command": "autobrancher.helloWorld",
-        "title": "Hello World"
-      },
-      {
         "command": "autobrancher.run",
         "title": "AutoBrancher: Run Branch Builder"
       },
       {
         "command": "generateScript.run",
         "title": "generateScript: Run Script Builder"
+      },
+        {
+        "command": "generateScriptByCommand.run",
+        "title": "generateScriptByCommand: Run Script Builder"
       }
     ]
   },

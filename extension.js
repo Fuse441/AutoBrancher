@@ -282,7 +282,9 @@ class StackAPI {
 async function runGenerate(input, mode = "branch") {
   try {
     const protocolPath = path.join(dir, "protocol");
-    const folder = fs.readdirSync(protocolPath);
+    const folder = fs
+      .readdirSync(protocolPath)
+      .filter((file) => file.endsWith(".json")); // ✅ กรองเฉพาะ .json
 
     if (input === "*") {
       for (const item of folder) {
@@ -315,6 +317,35 @@ async function runGenerate(input, mode = "branch") {
     }
   } catch (error) {
     outputChannel.appendLine("❌ Error: " + error.message);
+  }
+}
+
+
+function runGenerateByCommand(input) {
+  try {
+    const table = input.split(".");
+    const pathFile = path.join(dir, table[1], table[2] + ".json");
+    const file = fs.readFileSync(pathFile, "utf-8");
+    const jsonContent = JSON.parse(file);
+    const update = JSON.stringify({ $set: jsonContent }, null, 2);
+
+    const script = `
+db.getCollection("${table[1]}").updateOne(
+  { '${Object.keys(jsonContent)[0]}' : {$exists : true}},
+  ${update},
+  { upsert: true }
+);\n`;
+
+    fs.writeFileSync(path.join(dir, "dist", `${table[2]}.js`), script);
+    outputChannel.appendLine(
+      `✅ Generated script file at: ${path.join(
+        dir,
+        "dist",
+        table[1] + "_" + table[2]
+      )}`
+    );
+  } catch (error) {
+    outputChannel.appendLine(`❌ Generated script Error : ${error}`);
   }
 }
 
@@ -430,6 +461,22 @@ function activate(context) {
     }
   );
 
+  const generateScriptByCommand = vscode.commands.registerCommand(
+    "generateScriptByCommand.run",
+    async () => {
+      outputChannel.clear();
+      outputChannel.show();
+
+      const input = await vscode.window.showInputBox({
+        prompt: "กรุณากรอก Script ที่ต้องการสร้าง ",
+        placeHolder: "เช่น @TABLE.xxxx.xxxx",
+        ignoreFocusOut: true,
+      });
+      runGenerateByCommand(input);
+      // runGenerate(input, "script");
+    }
+  );
+  context.subscriptions.push(generateScriptByCommand);
   context.subscriptions.push(generateScriptDB);
   context.subscriptions.push(disposable);
 }
