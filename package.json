@@ -3,7 +3,7 @@
   "displayName": "MongoBrancher",
   "description": "",
   "publisher": "Demon-APIM",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "engines": {
     "vscode": "^1.99.0"
   },
