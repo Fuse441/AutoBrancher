@@ -326,27 +326,33 @@ async function runGenerate(input, mode = "branch") {
 }
 
 function runGenerateByCommand(input) {
+  const collection = {
+    vc: "validateCommand",
+    cd: "condition",
+    cm: "command",
+    pt: "protocol",
+    mr: "mappingResponse",
+    rf: "responseFormat",
+    rs: "rseponseStatus",
+  };
   try {
-    const table = input.split(".");
-    const pathFile = path.join(dir, table[1], table[2] + ".json");
+    const match = input.match(/^(vc|cd|cm|pt|mr|rf|rs)/);
+    const table = collection[match[0]];
+    const pathFile = path.join(dir, table, input + ".json");
     const file = fs.readFileSync(pathFile, "utf-8");
     const jsonContent = JSON.parse(file);
     const update = JSON.stringify({ $set: jsonContent }, null, 2);
 
     const script = `
-db.getCollection("${table[1]}").updateOne(
+db.getCollection("${table}").updateOne(
   { '${Object.keys(jsonContent)[0]}' : {$exists : true}},
   ${update},
   { upsert: true }
 );\n`;
 
-    fs.writeFileSync(path.join(dir, "dist", `${table[2]}.js`), script);
+    fs.writeFileSync(path.join(dir, "dist", `${input}.js`), script);
     outputChannel.appendLine(
-      `✅ Generated script file at: ${path.join(
-        dir,
-        "dist",
-        table[1] + "_" + table[2]
-      )}`
+      `✅ Generated script file at: ${path.join(dir, "dist", input)}`
     );
   } catch (error) {
     outputChannel.appendLine(`❌ Generated script Error : ${error}`);
@@ -473,7 +479,7 @@ function activate(context) {
 
       const input = await vscode.window.showInputBox({
         prompt: "กรุณากรอก Script ที่ต้องการสร้าง ",
-        placeHolder: "เช่น @TABLE.xxxx.xxxx",
+        placeHolder: "เช่น vc_xxxx , cd_xxxx",
         ignoreFocusOut: true,
       });
       runGenerateByCommand(input);
